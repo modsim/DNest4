@@ -185,8 +185,7 @@ void Sampler<ModelType>::update_particle(unsigned int thread, unsigned int which
 	LikelihoodType& logl = log_likelihoods[which];
 
 	// Do the proposal for the particle
-	ModelType proposal = particle;
-	double log_H = proposal.perturb(rng);
+	double log_H = particle.perturb(rng);
 
 	// Prevent unnecessary exponentiation of a large number
 	if(log_H > 0.0)
@@ -194,7 +193,7 @@ void Sampler<ModelType>::update_particle(unsigned int thread, unsigned int which
 
     if(rng.rand() <= exp(log_H))
     {
-    	LikelihoodType logl_proposal(proposal.log_likelihood(),
+    	LikelihoodType logl_proposal(particle.proposal_log_likelihood(),
 												logl.get_tiebreaker());
 
     	// Do the proposal for the tiebreaker
@@ -203,7 +202,7 @@ void Sampler<ModelType>::update_particle(unsigned int thread, unsigned int which
 	    // Accept?
 	    if(level.get_log_likelihood() < logl_proposal)
 	    {
-		    particle = proposal;
+		    particle.accept_perturbation();
 		    logl = logl_proposal;
 		    level.increment_accepts(1);
 	    }
