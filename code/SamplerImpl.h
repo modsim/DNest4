@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <iomanip>
 #include "Utils.h"
+#include "Pybind11_abortable.hpp"
 
 namespace DNest4
 {
