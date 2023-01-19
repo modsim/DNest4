@@ -273,6 +273,7 @@ void Sampler<ModelType>::run_thread(unsigned int thread)
 	// Alternate between MCMC and bookkeeping
 	while(true)
 	{
+	    ABORTABLE;
 		// Thread zero takes full responsibility for some tasks
 		// Setting up copies of levels
 		if(thread == 0)
