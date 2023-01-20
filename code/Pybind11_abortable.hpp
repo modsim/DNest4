@@ -3,7 +3,7 @@
 
 #ifdef DNEST4_FROM_PYBIND11
 
-#include <pybind11/detail/common.h>
+#include <pybind11/pybind11.h>
 
 #define DNEST4_ABORTABLE if (PyErr_CheckSignals() != 0) throw pybind11::error_already_set();
 

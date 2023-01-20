@@ -1,15 +1,19 @@
 #include <cassert>
+#include <chrono>
 #include <iostream>
 #include <fstream>
 #include <functional>
 #include <thread>
 #include <algorithm>
 #include <iomanip>
+
 #include "Utils.h"
 #include "Pybind11_abortable.hpp"
 
 namespace DNest4
 {
+
+const std::thread::id MAIN_THREAD_ID = std::this_thread::get_id();
 
 template<class ModelType>
 Sampler<ModelType>::Sampler(unsigned int num_threads, double compression,
@@ -100,7 +104,10 @@ void Sampler<ModelType>::run(unsigned int thin)
 			delete thread;
 	}
 
-	// Create the barrier
+	isThreadDone = std::vector<bool>(threads.size(), false);
+    shouldThreadsStop = false;
+
+    // Create the barrier
 	barrier = new Barrier(num_threads);
 
 	// Create and launch threads
@@ -113,9 +120,20 @@ void Sampler<ModelType>::run(unsigned int thin)
 		threads[i] = new std::thread(func);
 	}
 
+    // check whether all threads are done. If they are not, check for signals once every second.
+    while (!std::all_of(isThreadDone.begin(), isThreadDone.end(), [](bool v) {return v; })) {
+        std::cout << "main thread is checking for signals.." << std::endl;
+        DNEST4_ABORTABLE;
+        std::cout << "threads should stop" << std::endl;
+        std::cerr << "threads should stop" << std::endl;
+        shouldThreadsStop = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
+
 	// Join and de-allocate all threads and barrier
-	for(auto& t: threads)
-		t->join();
+	for(auto& t: threads) {
+        t->join();
+    }
 
 	// Delete dynamically allocated stuff and point to nullptr
 	delete barrier;
@@ -126,6 +144,7 @@ void Sampler<ModelType>::run(unsigned int thin)
 		t = nullptr;
 	}
 #else
+	// TODO check signal is caught here too
 	for(size_t i=0; i<threads.size(); ++i) run_thread(i);
 #endif
 
@@ -149,8 +168,7 @@ void Sampler<ModelType>::mcmc_thread(unsigned int thread)
 
 	// Do some MCMC
 	int which;
-	for(unsigned int i=0; i<options.thread_steps; ++i)
-	{
+	for(unsigned int i=0; i<options.thread_steps; ++i) {
 		which = start_index + rng.rand_int(options.num_particles);
 
 		if(rng.rand() <= 0.5)
@@ -274,7 +292,6 @@ void Sampler<ModelType>::run_thread(unsigned int thread)
 	// Alternate between MCMC and bookkeeping
 	while(true)
 	{
-	    DNEST4_ABORTABLE;
 		// Thread zero takes full responsibility for some tasks
 		// Setting up copies of levels
 		if(thread == 0)
@@ -291,8 +308,10 @@ void Sampler<ModelType>::run_thread(unsigned int thread)
 
 		// Check for termination
 		if(options.max_num_saves != 0 && count_saves != 0 &&
-				(count_saves%options.max_num_saves == 0))
-			return;
+				(count_saves%options.max_num_saves == 0)  && !shouldThreadsStop) {
+            isThreadDone[thread] = true;
+            return;
+		}
 
 		// Do the MCMC (all threads do this!)
 		mcmc_thread(thread);
@@ -375,7 +394,7 @@ bool Sampler<ModelType>::enough_levels(const std::vector<Level>& l) const
     }
 
     // Just compare with the value from OPTIONS
-    return (l.size() >= options.max_num_levels);   
+    return (l.size() >= options.max_num_levels);
 }
 
 template<class ModelType>
@@ -441,7 +460,7 @@ void Sampler<ModelType>::do_bookkeeping()
         difficulty = gap_norm_tot / weight_tot;
 
         double work_ratio_max = 20.0/sqrt(options.lambda);
-        double coeff = (work_ratio_max - 1.0)/(0.1 - 0.02); 
+        double coeff = (work_ratio_max - 1.0)/(0.1 - 0.02);
         if(difficulty >= 0.1)
             work_ratio = work_ratio_max;
         else if(difficulty >= 0.02)
