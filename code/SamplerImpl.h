@@ -122,10 +122,7 @@ void Sampler<ModelType>::run(unsigned int thin)
 
     // check whether all threads are done. If they are not, check for signals once every second.
     while (!std::all_of(isThreadDone.begin(), isThreadDone.end(), [](bool v) {return v; })) {
-        std::cout << "main thread is checking for signals.." << std::endl;
         DNEST4_ABORTABLE;
-        std::cout << "threads should stop" << std::endl;
-        std::cerr << "threads should stop" << std::endl;
         shouldThreadsStop = true;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
