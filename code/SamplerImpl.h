@@ -359,8 +359,8 @@ template<class ModelType>
 void Sampler<ModelType>::increase_max_num_saves(unsigned int increment)
 {
        unsigned int new_max_num_saves = options.max_num_saves + increment;
-       if(new_max_num_saves <= max_num_saves) {
-           throw std::runtime_error("unsigned integer overflow while trying to increase max_num_saves of DNest4 sampler.")
+       if(new_max_num_saves <= options.max_num_saves) {
+           throw std::runtime_error("unsigned integer overflow while trying to increase max_num_saves of DNest4 sampler.");
        }
        options.max_num_saves = new_max_num_saves;
 }
