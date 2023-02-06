@@ -14,25 +14,6 @@ namespace DNest4
 */
 class Options
 {
-	// All Sampler specialisations can access Options members
-	template<class ModelType>
-	friend class Sampler;
-
-	private:
-		// Numerical options
-		unsigned int num_particles;
-		unsigned int new_level_interval;
-		unsigned int save_interval;
-		unsigned int thread_steps;
-		unsigned int max_num_levels;
-		double lambda, beta;
-		unsigned int max_num_saves;
-
-		// Filenames
-		std::string sample_file;
-		std::string sample_info_file;
-		std::string levels_file;
-
 	public:
 		Options() {};
 		Options(unsigned int num_particles,
@@ -49,6 +30,20 @@ class Options
 
 		void print(std::ostream& out) const;
 		void read(std::istream& in);
+
+        // Numerical options
+        unsigned int num_particles;
+        unsigned int new_level_interval;
+        unsigned int save_interval;
+        unsigned int thread_steps;
+        unsigned int max_num_levels;
+        double lambda, beta;
+        unsigned int max_num_saves;
+
+        // Filenames
+        std::string sample_file;
+        std::string sample_info_file;
+        std::string levels_file;
 };
 
 } // namespace DNest4
