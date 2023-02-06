@@ -6,6 +6,7 @@ cimport cython
 from libc.math cimport cos, log, sqrt, abs, M_PI
 from libc.stdlib cimport rand as crand
 from libc.stdlib cimport RAND_MAX
+import math
 
 cpdef double rand():
     """
@@ -37,5 +38,10 @@ cpdef double randh():
 
 cpdef double wrap(double x, double a, double b):
     assert b > a
-    return (x - a)%(b - a) + a
+    result = my_mod(x - a, b - a) + a
+    return result
+
+cpdef my_mod(double y, double x):
+    assert(x > 0.0);
+    return (y/x - math.floor(y/x))*x;
 
