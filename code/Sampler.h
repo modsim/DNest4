@@ -26,7 +26,9 @@ class Sampler
 
 		// Threads and barrier
 		std::vector<std::thread*> threads;
-		Barrier* barrier;
+        std::vector<bool> isThreadDone;
+        bool shouldThreadsStop;
+        Barrier* barrier;
 
 		// Number of threads and compression
 		unsigned int num_threads;

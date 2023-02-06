@@ -1,14 +1,19 @@
 #include <cassert>
+#include <chrono>
 #include <iostream>
 #include <fstream>
 #include <functional>
 #include <thread>
 #include <algorithm>
 #include <iomanip>
+
 #include "Utils.h"
+#include "Pybind11_abortable.hpp"
 
 namespace DNest4
 {
+
+const std::thread::id MAIN_THREAD_ID = std::this_thread::get_id();
 
 template<class ModelType>
 Sampler<ModelType>::Sampler(unsigned int num_threads, double compression,
@@ -99,7 +104,10 @@ void Sampler<ModelType>::run(unsigned int thin)
 			delete thread;
 	}
 
-	// Create the barrier
+	isThreadDone = std::vector<bool>(threads.size(), false);
+    shouldThreadsStop = false;
+
+    // Create the barrier
 	barrier = new Barrier(num_threads);
 
 	// Create and launch threads
@@ -112,9 +120,17 @@ void Sampler<ModelType>::run(unsigned int thin)
 		threads[i] = new std::thread(func);
 	}
 
+    // check whether all threads are done. If they are not, check for signals once every second.
+    while (!std::all_of(isThreadDone.begin(), isThreadDone.end(), [](bool v) {return v; })) {
+        DNEST4_ABORTABLE;
+        shouldThreadsStop = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
+
 	// Join and de-allocate all threads and barrier
-	for(auto& t: threads)
-		t->join();
+	for(auto& t: threads) {
+        t->join();
+    }
 
 	// Delete dynamically allocated stuff and point to nullptr
 	delete barrier;
@@ -125,6 +141,7 @@ void Sampler<ModelType>::run(unsigned int thin)
 		t = nullptr;
 	}
 #else
+	// TODO check signal is caught here too
 	for(size_t i=0; i<threads.size(); ++i) run_thread(i);
 #endif
 
@@ -148,8 +165,7 @@ void Sampler<ModelType>::mcmc_thread(unsigned int thread)
 
 	// Do some MCMC
 	int which;
-	for(unsigned int i=0; i<options.thread_steps; ++i)
-	{
+	for(unsigned int i=0; i<options.thread_steps; ++i) {
 		which = start_index + rng.rand_int(options.num_particles);
 
 		if(rng.rand() <= 0.5)
@@ -185,8 +201,7 @@ void Sampler<ModelType>::update_particle(unsigned int thread, unsigned int which
 	LikelihoodType& logl = log_likelihoods[which];
 
 	// Do the proposal for the particle
-	ModelType proposal = particle;
-	double log_H = proposal.perturb(rng);
+	double log_H = particle.perturb(rng);
 
 	// Prevent unnecessary exponentiation of a large number
 	if(log_H > 0.0)
@@ -194,7 +209,7 @@ void Sampler<ModelType>::update_particle(unsigned int thread, unsigned int which
 
     if(rng.rand() <= exp(log_H))
     {
-    	LikelihoodType logl_proposal(proposal.log_likelihood(),
+    	LikelihoodType logl_proposal(particle.proposal_log_likelihood(),
 												logl.get_tiebreaker());
 
     	// Do the proposal for the tiebreaker
@@ -203,7 +218,7 @@ void Sampler<ModelType>::update_particle(unsigned int thread, unsigned int which
 	    // Accept?
 	    if(level.get_log_likelihood() < logl_proposal)
 	    {
-		    particle = proposal;
+		    particle.accept_perturbation();
 		    logl = logl_proposal;
 		    level.increment_accepts(1);
 	    }
@@ -290,8 +305,10 @@ void Sampler<ModelType>::run_thread(unsigned int thread)
 
 		// Check for termination
 		if(options.max_num_saves != 0 && count_saves != 0 &&
-				(count_saves%options.max_num_saves == 0))
-			return;
+				(count_saves%options.max_num_saves == 0)  && !shouldThreadsStop) {
+            isThreadDone[thread] = true;
+            return;
+		}
 
 		// Do the MCMC (all threads do this!)
 		mcmc_thread(thread);
@@ -341,7 +358,11 @@ void Sampler<ModelType>::run_thread(unsigned int thread)
 template<class ModelType>
 void Sampler<ModelType>::increase_max_num_saves(unsigned int increment)
 {
-	options.max_num_saves += increment;
+       unsigned int new_max_num_saves = options.max_num_saves + increment;
+       if(new_max_num_saves <= max_num_saves) {
+           throw std::runtime_error("unsigned integer overflow while trying to increase max_num_saves of DNest4 sampler.")
+       }
+       options.max_num_saves = new_max_num_saves;
 }
 
 template<class ModelType>
@@ -374,7 +395,7 @@ bool Sampler<ModelType>::enough_levels(const std::vector<Level>& l) const
     }
 
     // Just compare with the value from OPTIONS
-    return (l.size() >= options.max_num_levels);   
+    return (l.size() >= options.max_num_levels);
 }
 
 template<class ModelType>
@@ -440,7 +461,7 @@ void Sampler<ModelType>::do_bookkeeping()
         difficulty = gap_norm_tot / weight_tot;
 
         double work_ratio_max = 20.0/sqrt(options.lambda);
-        double coeff = (work_ratio_max - 1.0)/(0.1 - 0.02); 
+        double coeff = (work_ratio_max - 1.0)/(0.1 - 0.02);
         if(difficulty >= 0.1)
             work_ratio = work_ratio_max;
         else if(difficulty >= 0.02)
