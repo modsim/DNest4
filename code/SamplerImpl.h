@@ -105,7 +105,7 @@ void Sampler<ModelType>::run(unsigned int thin)
 	}
 
 	isThreadDone = std::vector<bool>(threads.size(), false);
-    shouldThreadsStop = false;
+    this->shouldThreadsStop = false;
 
     // Create the barrier
 	barrier = new Barrier(num_threads);
@@ -123,7 +123,6 @@ void Sampler<ModelType>::run(unsigned int thin)
     // check whether all threads are done. If they are not, check for signals once every second.
     while (!std::all_of(isThreadDone.begin(), isThreadDone.end(), [](bool v) {return v; })) {
         DNEST4_ABORTABLE;
-        shouldThreadsStop = true;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 
@@ -304,8 +303,7 @@ void Sampler<ModelType>::run_thread(unsigned int thread)
 #endif
 
 		// Check for termination
-		if(shouldThreadsStop || (options.max_num_saves != 0 && count_saves != 0 &&
-				(count_saves%options.max_num_saves == 0))) {
+		if(shouldThreadsStop || (options.max_num_saves != 0 && count_saves != 0 && (count_saves%options.max_num_saves == 0))) {
             isThreadDone[thread] = true;
             return;
 		}
