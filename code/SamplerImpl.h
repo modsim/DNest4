@@ -304,8 +304,8 @@ void Sampler<ModelType>::run_thread(unsigned int thread)
 #endif
 
 		// Check for termination
-		if(options.max_num_saves != 0 && count_saves != 0 &&
-				(count_saves%options.max_num_saves == 0)  && !shouldThreadsStop) {
+		if(shouldThreadsStop || (options.max_num_saves != 0 && count_saves != 0 &&
+				(count_saves%options.max_num_saves == 0))) {
             isThreadDone[thread] = true;
             return;
 		}
