@@ -2,6 +2,7 @@
 #define DNest4_RNG
 
 #include <random>
+#include "hops/RandomNumberGenerator/RandomNumberGenerator.hpp"
 
 namespace DNest4
 {
@@ -13,9 +14,6 @@ class RNG
 {
 	private:
 
-		// 64-bit Mersenne Twister
-		std::mt19937_64 twister;
-
 		// For uniform distribution
 		std::uniform_real_distribution<double> uniform;
 
@@ -26,6 +24,8 @@ class RNG
         static bool randh_is_randh2;
 
 	public:
+        hops::RandomNumberGenerator engine;
+
 		// Constructor
 		RNG();
 

@@ -79,7 +79,7 @@ void Sampler<ModelType>::initialise(unsigned int first_seed)
 	std::cout<<" from the prior..."<<std::flush;
 	for(size_t i=0; i<particles.size(); ++i)
 	{
-		particles[i].from_prior(rng);
+		particles[i].from_prior(i);
 		log_likelihoods[i] = LikelihoodType(particles[i].log_likelihood(),
 																rng.rand());
 	}

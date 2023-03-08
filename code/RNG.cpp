@@ -24,17 +24,17 @@ RNG::RNG(unsigned int seed)
 
 void RNG::set_seed(unsigned int seed)
 {
-	twister.seed(seed);
+	engine.seed(seed);
 }
 
 double RNG::rand()
 {
-	return uniform(twister);
+	return uniform(engine);
 }
 
 double RNG::randn()
 {
-	return normal(twister);
+	return normal(engine);
 }
 
 double RNG::randt2()

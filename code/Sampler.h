@@ -8,7 +8,6 @@
 #include "LikelihoodType.h"
 #include "Options.h"
 #include "Level.h"
-#include "RNG.h"
 #include "Barrier.h"
 
 namespace DNest4
