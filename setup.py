@@ -69,15 +69,6 @@ if __name__ == "__main__":
 
         ext = [
             Extension(
-                "dnest4._dnest4",
-                sources=src,
-                language="c++",
-                libraries=libraries,
-                include_dirs=include_dirs,
-                extra_compile_args=extra_compile_args,
-                extra_link_args=extra_link_args,
-            ),
-            Extension(
                 "dnest4.utils",
                 sources=[
                     os.path.join(basedir, "python", "dnest4", "utils.pyx")
