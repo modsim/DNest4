@@ -16,8 +16,15 @@ void StraightLine::calculate_mu()
 	mu = m*x + b;
 }
 
-void StraightLine::from_prior(RNG& rng)
+void StraightLine::calculate_mu_proposed()
 {
+	const auto& x = Data::get_instance().get_x();
+	mu_proposed = m_proposed*x + b_proposed;
+}
+
+void StraightLine::from_prior(size_t i)
+{
+    RNG rng(i); 
 	// Naive diffuse prior
 	m = 1E3*rng.randn();
 	b = 1E3*rng.randn();
@@ -31,6 +38,9 @@ void StraightLine::from_prior(RNG& rng)
 
 double StraightLine::perturb(RNG& rng)
 {
+    m_proposed = m;
+    b_proposed = b;
+    sigma_proposed = sigma;
 	double log_H = 0.;
 
 	// Proposals explore the prior
@@ -39,22 +49,22 @@ double StraightLine::perturb(RNG& rng)
 	if(which == 0)
 	{
 		log_H -= -0.5*pow(m/1E3, 2);
-		m += 1E3*rng.randh();
+		m_proposed += 1E3*rng.randh();
 		log_H += -0.5*pow(m/1E3, 2);
 	}
 	else if(which == 1)
 	{
 		log_H -= -0.5*pow(b/1E3, 2);
-		b += 1E3*rng.randh();
+		b_proposed += 1E3*rng.randh();
 		log_H += -0.5*pow(b/1E3, 2);
 	}
 	else
 	{
 		// Usual log-uniform prior trick
-		sigma = log(sigma);
-		sigma += 20.*rng.randh();
-		wrap(sigma, -10., 10.);
-		sigma = exp(sigma);
+		sigma_proposed = log(sigma_proposed);
+		sigma_proposed += 20.*rng.randh();
+		wrap(sigma_proposed, -10., 10.);
+		sigma_proposed = exp(sigma_proposed);
 	}
 
 	// Pre-reject
@@ -65,9 +75,26 @@ double StraightLine::perturb(RNG& rng)
 
 	// Calculate mu again if m or b changed
 	if(which == 0 || which == 1)
-		calculate_mu();
+		calculate_mu_proposed();
 
 	return log_H;
+}
+
+void StraightLine::accept_perturbation() {
+    mu = mu_proposed;
+    b = b_proposed;
+    m = m_proposed;
+    sigma=sigma_proposed;
+}
+
+double StraightLine::proposal_log_likelihood() const {
+	const auto& y = Data::get_instance().get_y();
+
+	// Variance
+	double var = sigma_proposed*sigma_proposed;
+
+	// Conventional gaussian sampling distribution
+	return -0.5*y.size()*log(2*M_PI*var) - 0.5*pow(y - mu_proposed, 2).sum()/var;
 }
 
 double StraightLine::log_likelihood() const

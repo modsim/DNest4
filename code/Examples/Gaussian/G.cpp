@@ -1,3 +1,4 @@
+#include <iostream>
 #include "G.h"
 #include "DNest4/code/DNest4.h"
 
@@ -7,6 +8,8 @@ using namespace DNest4;
 double scale = 10;
 
 G::G() {
+    x0=-1991.0;
+    x1=-1991.0;
 
 }
 
@@ -40,6 +43,18 @@ double G::log_likelihood() const
 void G::print(std::ostream& out) const
 {
 		out<<x0 << ' ' << x1 << ' ';
+}
+
+void G::read(std::istream& in) 
+{
+    std::cout << "reading " << std::endl;
+    double _x0;
+    double _x1;
+    in>>_x0;
+    in>>_x1;
+    std::cout << "read " << _x0 << " and " << _x1 << std::endl;;
+    x0=_x0;
+    x1=_x1;
 }
 
 string G::description() const

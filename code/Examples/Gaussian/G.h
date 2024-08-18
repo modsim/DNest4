@@ -27,6 +27,8 @@ class G
 		// Print to stream
 		void print(std::ostream& out) const;
 
+		void read(std::istream& in);
+
 		// Return string with column information
 		std::string description() const;
 };
