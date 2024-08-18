@@ -15,7 +15,7 @@ template<class ModelType>
 Sampler<ModelType> setup(int argc, char** argv);
 
 template<class ModelType>
-Sampler<ModelType> setup(const CommandLineOptions& options);
+Sampler<ModelType> setup(const CommandLineOptions& options, bool load_checkpoint=false);
 
 template<class ModelType>
 void start(int argc, char** argv);

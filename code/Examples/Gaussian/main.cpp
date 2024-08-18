@@ -11,10 +11,10 @@ int main(int argc, char** argv)
     //start<G>(argc, argv);
 
     CommandLineOptions options(argc, argv);
-    Sampler<G> sampler = setup<G>(options);
-    std::fstream fin("sampler_state.txt", std::ios::in);
-    sampler.read(fin);
-    std::cout << "finished reading" << std::endl;
+    Sampler<G> sampler = setup<G>(options, false);
+//    std::fstream fin("sampler_state.txt", std::ios::in);
+//    sampler.read(fin);
+//    std::cout << "finished reading" << std::endl;
     sampler.run();
 	return 0;
 }

@@ -96,6 +96,8 @@ class Sampler
         bool enough_levels(const std::vector<Level>& l) const;
 
 		// Functions to do with the output files
+        void read_checkpoint();
+        void save_checkpoint();
 		void initialise_output_files() const;
 		void save_levels() const;
 		void save_particle();
@@ -113,7 +115,7 @@ class Sampler
 						bool save_to_disk, bool _adaptive);
 
 		// Set rng seeds, then draw all particles from the prior
-		void initialise(unsigned int first_seed);
+		void initialise(unsigned int first_seed, bool continue_from_checkpoint=false);
 
 		// Launch everything
 		void run(unsigned int thin=1);

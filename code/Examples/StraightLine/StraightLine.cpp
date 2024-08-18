@@ -34,6 +34,10 @@ void StraightLine::from_prior(size_t i)
 
 	// Compute the model line
 	calculate_mu();
+    m_proposed = m;
+    b_proposed = b;
+    sigma_proposed = sigma;
+    mu_proposed = mu;
 }
 
 double StraightLine::perturb(RNG& rng)
@@ -111,7 +115,18 @@ double StraightLine::log_likelihood() const
 
 void StraightLine::print(std::ostream& out) const
 {
-	out<<m<<' '<<b<<' '<<sigma;
+	out<<m<<' '<<b<<' '<<sigma << ' ' <<m_proposed <<' ' << b_proposed << ' ' << sigma_proposed << " ";
+}
+
+void StraightLine::read(std::istream& in) 
+{
+	in>>m;
+	in>>b;
+	in>>sigma;
+	in>>m_proposed;
+	in>>b_proposed;
+	in>>sigma_proposed;
+    std::cout << "read "<<m<<' '<<b<<' '<<sigma <<m_proposed <<' ' << b_proposed << ' ' << sigma_proposed;
 }
 
 string StraightLine::description() const

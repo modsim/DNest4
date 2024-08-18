@@ -9,7 +9,9 @@ using namespace DNest4;
 int main(int argc, char** argv)
 {
 	Data::get_instance().load("road.txt");
-	start<StraightLine>(argc, argv);
+    CommandLineOptions options(argc, argv);
+    Sampler<StraightLine> sampler = setup<StraightLine>(options, true);
+    sampler.run();
 	return 0;
 }
 

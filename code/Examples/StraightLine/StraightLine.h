@@ -42,6 +42,7 @@ class StraightLine
 		// Likelihood function
 		double proposal_log_likelihood() const;
 
+		void read(std::istream& in);
 		// Print to stream
 		void print(std::ostream& out) const;
 

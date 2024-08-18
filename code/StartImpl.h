@@ -16,7 +16,7 @@ Sampler<ModelType> setup(int argc, char** argv)
 }
 
 template<class ModelType>
-Sampler<ModelType> setup(const CommandLineOptions& options)
+Sampler<ModelType> setup(const CommandLineOptions& options, bool load_checkpoint)
 {
 	std::cout<<"# Using "<<options.get_num_threads()<<" thread"<<
 		((options.get_num_threads() == 1)?("."):("s."))<<std::endl;
@@ -34,7 +34,7 @@ Sampler<ModelType> setup(const CommandLineOptions& options)
 								true, options.get_adaptive());
 
 	// Seed RNGs
-	sampler.initialise(options.get_seed_uint());
+	sampler.initialise(options.get_seed_uint(), load_checkpoint);
 
 	return sampler;
 }

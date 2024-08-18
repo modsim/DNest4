@@ -58,7 +58,30 @@ Sampler<ModelType>::Sampler(unsigned int num_threads, double compression,
 }
 
 template<class ModelType>
-void Sampler<ModelType>::initialise(unsigned int first_seed)
+void Sampler<ModelType>::save_checkpoint() {
+    std::fstream fout("sampler_state.txt", std::ios::out | std::ios::app);
+    if(fout.is_open()) {
+        this->write(fout);
+    }
+    else {
+        std::cerr << "error saving checkpoint. Continuing" << std::endl;
+    }
+}
+
+template<class ModelType>
+void Sampler<ModelType>::read_checkpoint() {
+    std::fstream fin("sampler_state.txt", std::ios::in);
+    if(fin.is_open()) {
+        this->read(fin);
+    }
+    else {
+        std::cerr << "error loading checkpoint. Aborting" << std::endl;
+        exit(1);
+    }
+}
+
+template<class ModelType>
+void Sampler<ModelType>::initialise(unsigned int first_seed, bool continue_from_checkpoint)
 {
 	// Reference to an RNG to use
 	RNG& rng = rngs[0];
@@ -68,28 +91,35 @@ void Sampler<ModelType>::initialise(unsigned int first_seed)
 	for(auto& a: above)
 		a.reserve(2*options.new_level_interval);
 
-	std::cout<<"# Seeding random number generators. First seed = ";
-	std::cout<<first_seed<<"."<<std::endl;
-	// Seed the RNGs, incrementing the seed each time
-	for(RNG& rng: rngs)
-		rng.set_seed(first_seed++);
+    if(continue_from_checkpoint) {
+        std::cout << "# Continuing from checkpoint ";
+        read_checkpoint();
+    }
+    else {
+        std::cout << "# Seeding random number generators. First seed = ";
+        std::cout << first_seed << "." << std::endl;
+        // Seed the RNGs, incrementing the seed each time
+        for (RNG &rng: rngs)
+            rng.set_seed(first_seed++);
 
-	std::cout<<"# Generating "<<particles.size();
-	std::cout<<" particle"<<((particles.size() > 1)?("s"):(""));
-	std::cout<<" from the prior..."<<std::flush;
-	for(size_t i=0; i<particles.size(); ++i)
-	{
-		particles[i].from_prior(i);
-		log_likelihoods[i] = LikelihoodType(particles[i].log_likelihood(),
-																rng.rand());
-	}
-	std::cout<<"done."<<std::endl;
-	initialise_output_files();
+        std::cout << "# Generating " << particles.size();
+        std::cout << " particle" << ((particles.size() > 1) ? ("s") : (""));
+        std::cout << " from the prior..." << std::flush;
+        for (size_t i = 0; i < particles.size(); ++i) {
+            particles[i].from_prior(i);
+            log_likelihoods[i] = LikelihoodType(particles[i].log_likelihood(),
+                                                rng.rand());
+        }
+        std::cout << "done." << std::endl;
+        initialise_output_files();
+    }
 }
 
 template<class ModelType>
 void Sampler<ModelType>::run(unsigned int thin)
 {
+    std::cout << "start run with " << levels.size() << " levels" << std::endl;
+    std::cout << "start run with " << particles.size() << " particles" << std::endl;
 	// Set the thining of terminal output
 	thin_print = thin;
 
@@ -648,51 +678,97 @@ void Sampler<ModelType>::kill_lagging_particles()
 template<class ModelType>
 void Sampler<ModelType>::print(std::ostream& out) const
 {
-	out<<save_to_disk<<' ';
-	out<<num_threads<<' ';
-	out<<compression<<' ';
+    out<<save_to_disk<<' ';
+    out<<num_threads<<' ';
+    out<<compression<<' ';
 
-	out<<options<<' ';
+    out<<options<<' ';
 
-	for(const auto& p: particles)
-		p.print(out);
+    out << particles.size() << ' ';
+    std::cout << "writing "  << particles.size() << " particles" << std::endl;
+    for(const auto& p: particles)
+        p.print(out);
 
-	for(const auto& l: log_likelihoods)
-		l.print(out);
+    out << log_likelihoods.size() << ' ';
+    std::cout << "writing "  << log_likelihoods.size() << " log_likelihoods" << std::endl;
+    for(const auto& l: log_likelihoods)
+        l.print(out);
 
-	for(const auto& l: level_assignments)
-		out<<l<<' ';
+    out << level_assignments.size() << ' ';
+    std::cout << "writing "  << level_assignments.size() << " level assignments" << std::endl;
+    for(const auto& l: level_assignments)
+        out<<l<<' ';
 
-	for(const auto& l: levels)
-		l.print(out);
+    out << levels.size() << ' ';
+    std::cout << "writing "  << levels.size() << " levels" << std::endl;
+    for(const auto& l: levels)
+        l.print(out);
 
-	out<<count_saves<<' ';
-	out<<count_mcmc_steps<<' ';
+    out<<count_saves<<' ';
+    out<<count_mcmc_steps<<' ';
 }
 
 template<class ModelType>
 void Sampler<ModelType>::read(std::istream& in)
 {
-	in>>save_to_disk;
-	in>>num_threads;
-	in>>compression;
+    in>>save_to_disk;
+    in>>num_threads;
+    in>>compression;
 
-	in>>options;
+    // We want to log the used options, but we do not want to overwrite
+    // the passed options. We need to read the options so the stream skips over them.
+    Options throw_away_options;
+    in>>throw_away_options;
 
-	for(auto& p: particles)
-		p.read(in);
+    size_t num_particles;
+    in >> num_particles;
+    std::cout << "reading in " << num_particles << " particles" << std::endl;
+    particles.clear();
+    for(size_t i=0; i<num_particles;++i) {
+        ModelType p;
+        p.read(in);
+        particles.push_back(p);
+        std::cout << "reading in particle " << std::endl;
+    }
 
-	for(auto& l: log_likelihoods)
-		l.read(in);
+    size_t num_log_likelihoods;
+    in >> num_log_likelihoods;
+    std::cout << "reading in " << num_log_likelihoods << " log_likelihoods" << std::endl;
+    log_likelihoods.clear();
+    for(size_t i=0; i<num_log_likelihoods;++i) {
+        LikelihoodType l;
+        l.read(in);
+        log_likelihoods.push_back(l);
+        std::cout << "read l " << l.get_value() << std::endl;
+    }
 
-	for(auto l: level_assignments)
-		in>>l;
+    size_t num_level_assignments;
+    in >> num_level_assignments;
+    std::cout << "reading in " << num_level_assignments << " level_assignments" << std::endl;
+    level_assignments.clear();
+    for(size_t i=0; i<num_level_assignments;++i) {
+        unsigned int l;
+        in>>l;
+        level_assignments.push_back(l);
+        std::cout << "read level assignment " << l << std::endl;
+    }
 
-	for(auto& l: levels)
-		l.read(in);
+    size_t num_levels;
+    in >> num_levels;
+    std::cout << "reading in " << num_levels << " levels" << std::endl;
+    levels.clear();
+    for(size_t i=0; i<num_levels;++i) {
+        Level level;
+        level.read(in);
+        // std::cout << "read level  " << level.get_log_X() << " " << level.get_visits() << std::endl;
+        levels.push_back(level);
+    }
 
-	in>>count_saves;
-	in>>count_mcmc_steps;
+    save_levels();
+    in>>count_saves;
+    in>>count_mcmc_steps;
+
+    std::cout << "saves are " << count_saves << " with " << count_mcmc_steps << " mcmc steps" << std::endl;
 }
 
 } // namespace DNest4
