@@ -78,7 +78,12 @@ void Sampler<ModelType>::read_checkpoint() {
         std::cerr << "error loading checkpoint. Aborting" << std::endl;
         exit(1);
     }
+    if(options.max_num_saves != 0 && count_saves>=options.max_num_saves) {
+        std::cout << "max num saves already achieved" << std::endl;
+        exit(0);
+    }
 }
+
 
 template<class ModelType>
 void Sampler<ModelType>::initialise(unsigned int first_seed, bool continue_from_checkpoint)
