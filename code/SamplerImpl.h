@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <cassert>
 #include <chrono>
 #include <iostream>
@@ -59,9 +60,11 @@ Sampler<ModelType>::Sampler(unsigned int num_threads, double compression,
 
 template<class ModelType>
 void Sampler<ModelType>::save_checkpoint() {
-    std::fstream fout("sampler_state.txt", std::ios::out | std::ios::app);
+    std::fstream fout("_sampler_state.txt", std::ios::out | std::ios::app);
     if(fout.is_open()) {
-        this->write(fout);
+        this->print(fout);
+        fout.close();
+        std::rename("_sampler_state.txt", "sampler_state.txt");
     }
     else {
         std::cerr << "error saving checkpoint. Continuing" << std::endl;
@@ -123,8 +126,6 @@ void Sampler<ModelType>::initialise(unsigned int first_seed, bool continue_from_
 template<class ModelType>
 void Sampler<ModelType>::run(unsigned int thin)
 {
-    std::cout << "start run with " << levels.size() << " levels" << std::endl;
-    std::cout << "start run with " << particles.size() << " particles" << std::endl;
 	// Set the thining of terminal output
 	thin_print = thin;
 
@@ -180,9 +181,7 @@ void Sampler<ModelType>::run(unsigned int thin)
 #endif
 
 	// Save the sampler state to a file.
-	std::fstream fout("sampler_state.txt", std::ios::out);
-	print(fout);
-	fout.close();
+    this->save_checkpoint();
 }
 
 template<class ModelType>
@@ -515,6 +514,7 @@ void Sampler<ModelType>::do_bookkeeping()
 		if(!created_level)
 			save_levels();
 
+        save_checkpoint();
 
         // Print work ratio
         if(!enough_levels(levels) && adaptive)
@@ -690,22 +690,18 @@ void Sampler<ModelType>::print(std::ostream& out) const
     out<<options<<' ';
 
     out << particles.size() << ' ';
-    std::cout << "writing "  << particles.size() << " particles" << std::endl;
     for(const auto& p: particles)
         p.print(out);
 
     out << log_likelihoods.size() << ' ';
-    std::cout << "writing "  << log_likelihoods.size() << " log_likelihoods" << std::endl;
     for(const auto& l: log_likelihoods)
         l.print(out);
 
     out << level_assignments.size() << ' ';
-    std::cout << "writing "  << level_assignments.size() << " level assignments" << std::endl;
     for(const auto& l: level_assignments)
         out<<l<<' ';
 
     out << levels.size() << ' ';
-    std::cout << "writing "  << levels.size() << " levels" << std::endl;
     for(const auto& l: levels)
         l.print(out);
 
@@ -727,53 +723,43 @@ void Sampler<ModelType>::read(std::istream& in)
 
     size_t num_particles;
     in >> num_particles;
-    std::cout << "reading in " << num_particles << " particles" << std::endl;
     particles.clear();
     for(size_t i=0; i<num_particles;++i) {
         ModelType p;
         p.read(in);
         particles.push_back(p);
-        std::cout << "reading in particle " << std::endl;
     }
 
     size_t num_log_likelihoods;
     in >> num_log_likelihoods;
-    std::cout << "reading in " << num_log_likelihoods << " log_likelihoods" << std::endl;
     log_likelihoods.clear();
     for(size_t i=0; i<num_log_likelihoods;++i) {
         LikelihoodType l;
         l.read(in);
         log_likelihoods.push_back(l);
-        std::cout << "read l " << l.get_value() << std::endl;
     }
 
     size_t num_level_assignments;
     in >> num_level_assignments;
-    std::cout << "reading in " << num_level_assignments << " level_assignments" << std::endl;
     level_assignments.clear();
     for(size_t i=0; i<num_level_assignments;++i) {
         unsigned int l;
         in>>l;
         level_assignments.push_back(l);
-        std::cout << "read level assignment " << l << std::endl;
     }
 
     size_t num_levels;
     in >> num_levels;
-    std::cout << "reading in " << num_levels << " levels" << std::endl;
     levels.clear();
     for(size_t i=0; i<num_levels;++i) {
         Level level;
         level.read(in);
-        // std::cout << "read level  " << level.get_log_X() << " " << level.get_visits() << std::endl;
         levels.push_back(level);
     }
 
     save_levels();
     in>>count_saves;
     in>>count_mcmc_steps;
-
-    std::cout << "saves are " << count_saves << " with " << count_mcmc_steps << " mcmc steps" << std::endl;
 }
 
 } // namespace DNest4
