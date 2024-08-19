@@ -26,6 +26,7 @@ Options::Options(unsigned int num_particles,
 ,sample_file("sample.txt")
 ,sample_info_file("sample_info.txt")
 ,levels_file("levels.txt")
+,checkpoint_file("sampler_state.txt")
 {
 	assert(num_particles > 0 && new_level_interval > 0 &&
 		max_num_levels > 0 && lambda > 0. &&
@@ -36,6 +37,7 @@ Options::Options(const char* filename)
 :sample_file("sample.txt")
 ,sample_info_file("sample_info.txt")
 ,levels_file("levels.txt")
+,checkpoint_file("sampler_state.txt")
 {
 	load(filename);
 }
@@ -90,6 +92,7 @@ void Options::print(std::ostream& out) const
 	out<<sample_file<<' ';
 	out<<sample_info_file<<' ';
 	out<<levels_file<<' ';
+	out<<checkpoint_file<<' ';
 }
 
 void Options::read(std::istream& in)
@@ -106,6 +109,7 @@ void Options::read(std::istream& in)
 	in>>sample_file;
 	in>>sample_info_file;
 	in>>levels_file;
+	in>>checkpoint_file;
 }
 
 } // namespace DNest4

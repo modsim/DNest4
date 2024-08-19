@@ -60,11 +60,13 @@ Sampler<ModelType>::Sampler(unsigned int num_threads, double compression,
 
 template<class ModelType>
 void Sampler<ModelType>::save_checkpoint() {
-    std::fstream fout("_sampler_state.txt", std::ios::out | std::ios::app);
+    std::string temp_name = options.checkpoint_file;
+    temp_name.insert(0, 1, '_');
+    std::fstream fout(temp_name, std::ios::out | std::ios::app);
     if(fout.is_open()) {
         this->print(fout);
         fout.close();
-        std::rename("_sampler_state.txt", "sampler_state.txt");
+        std::rename(temp_name.c_str(), options.checkpoint_file.c_str());
     }
     else {
         std::cerr << "error saving checkpoint. Continuing" << std::endl;
@@ -73,7 +75,7 @@ void Sampler<ModelType>::save_checkpoint() {
 
 template<class ModelType>
 void Sampler<ModelType>::read_checkpoint() {
-    std::fstream fin("sampler_state.txt", std::ios::in);
+    std::fstream fin(options.checkpoint_file, std::ios::in);
     if(fin.is_open()) {
         this->read(fin);
     }

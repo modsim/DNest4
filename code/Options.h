@@ -44,6 +44,7 @@ class Options
         std::string sample_file;
         std::string sample_info_file;
         std::string levels_file;
+        std::string checkpoint_file;
 };
 
 } // namespace DNest4
