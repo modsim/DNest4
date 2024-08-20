@@ -62,6 +62,7 @@ template<class ModelType>
 void Sampler<ModelType>::save_checkpoint() {
     std::string temp_name = options.checkpoint_file + ".next";
     std::fstream fout(temp_name, std::ios::out);
+    fout << std::scientific << std::setprecision(16);
     if(fout.is_open()) {
         this->print(fout);
         fout.close();
@@ -684,6 +685,8 @@ void Sampler<ModelType>::kill_lagging_particles()
 template<class ModelType>
 void Sampler<ModelType>::print(std::ostream& out) const
 {
+    // doubles have between 15 and 16 digits of precision
+    out << std::scientific << std::setprecision(16);
     out<<save_to_disk<<' ';
     out<<num_threads<<' ';
     out<<compression<<' ';
@@ -705,6 +708,18 @@ void Sampler<ModelType>::print(std::ostream& out) const
     out << levels.size() << ' ';
     for(const auto& l: levels)
         l.print(out);
+
+    out << rngs.size() << ' ';
+    for(const auto& r: rngs) {
+         std::array<unsigned char, 16>  state = r.engine.getStateInBytes();
+         for(size_t i=0; i<state.size();++i) {
+            out << state[i] << ' ';
+         }
+         std::array<unsigned char, 16>  stream = r.engine.getStreamInBytes();
+         for(size_t i=0; i<stream.size();++i) {
+            out << stream[i] << ' ';
+         }
+    }
 
     out<<count_saves<<' ';
     out<<count_mcmc_steps<<' ';
@@ -756,6 +771,22 @@ void Sampler<ModelType>::read(std::istream& in)
         Level level;
         level.read(in);
         levels.push_back(level);
+    }
+
+    size_t num_rngs;
+    in >> num_rngs;
+    for(size_t i=0; i<num_rngs;++i) {
+        std::array<unsigned char, 16>  state;
+        for(size_t j=0; j<state.size();++j) {
+           in >> state[j];
+        }
+        rngs[i].engine.setState(state);
+
+        std::array<unsigned char, 16>  stream;
+        for(size_t j=0; j<stream.size();++j) {
+            in >> stream[j];
+        }
+        rngs[i].engine.setStream(stream);
     }
 
     save_levels();
