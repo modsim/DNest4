@@ -14,8 +14,6 @@
 namespace DNest4
 {
 
-const std::thread::id MAIN_THREAD_ID = std::this_thread::get_id();
-
 template<class ModelType>
 Sampler<ModelType>::Sampler(unsigned int num_threads, double compression,
 							const Options& options, bool save_to_disk,
@@ -93,28 +91,28 @@ void Sampler<ModelType>::read_checkpoint() {
 template<class ModelType>
 void Sampler<ModelType>::initialise(unsigned int first_seed, bool continue_from_checkpoint)
 {
-	// Reference to an RNG to use
-	RNG& rng = rngs[0];
-
-	// Assign memory for storage
-	all_above.reserve(2*options.new_level_interval);
-	for(auto& a: above)
-		a.reserve(2*options.new_level_interval);
-
     if(continue_from_checkpoint) {
         std::cout << "# Continuing from checkpoint ";
         read_checkpoint();
     }
     else {
+        // Assign memory for storage
+        all_above.reserve(2*options.new_level_interval);
+        for(auto& a: above)
+            a.reserve(2*options.new_level_interval);
+
         std::cout << "# Seeding random number generators. First seed = ";
         std::cout << first_seed << "." << std::endl;
         // Seed the RNGs, incrementing the seed each time
-        for (RNG &rng: rngs)
+        for (RNG &rng: rngs) {
             rng.set_seed(first_seed++);
+        }
 
         std::cout << "# Generating " << particles.size();
         std::cout << " particle" << ((particles.size() > 1) ? ("s") : (""));
         std::cout << " from the prior..." << std::flush;
+        // Reference to an RNG to use
+        RNG& rng = rngs[0];
         for (size_t i = 0; i < particles.size(); ++i) {
             particles[i].from_prior(i);
             log_likelihoods[i] = LikelihoodType(particles[i].log_likelihood(),
@@ -506,17 +504,19 @@ void Sampler<ModelType>::do_bookkeeping()
 
 	// Save levels if one was created
 	if(created_level)
-		save_levels();
+	{
+        save_levels();
+        save_checkpoint();
+    }
 
 	if(count_mcmc_steps_since_save >= options.save_interval)
 	{
 		save_particle();
+        save_checkpoint();
 
 		// If a level was not created, save anyway because of the time
 		if(!created_level)
 			save_levels();
-
-        save_checkpoint();
 
         // Print work ratio
         if(!enough_levels(levels) && adaptive)
@@ -709,6 +709,11 @@ void Sampler<ModelType>::print(std::ostream& out) const
     for(const auto& l: levels)
         l.print(out);
 
+    out << all_above.size() << ' ';
+    for(const auto& l: all_above) {
+        l.print(out);
+    }
+
     out << rngs.size() << ' ';
     for(const auto& r: rngs) {
          std::array<unsigned char, 16>  state = r.engine.getStateInBytes();
@@ -723,6 +728,7 @@ void Sampler<ModelType>::print(std::ostream& out) const
 
     out<<count_saves<<' ';
     out<<count_mcmc_steps<<' ';
+    out<<count_mcmc_steps_since_save<<' ';
 }
 
 template<class ModelType>
@@ -773,6 +779,15 @@ void Sampler<ModelType>::read(std::istream& in)
         levels.push_back(level);
     }
 
+    size_t num_above;
+    in >> num_above;
+    all_above.clear();
+    for(size_t i=0; i<num_above;++i) {
+        LikelihoodType l;
+        l.read(in);
+        all_above.push_back(l);
+    }
+
     size_t num_rngs;
     in >> num_rngs;
     for(size_t i=0; i<num_rngs;++i) {
@@ -789,9 +804,9 @@ void Sampler<ModelType>::read(std::istream& in)
         rngs[i].engine.setStream(stream);
     }
 
-    save_levels();
     in>>count_saves;
     in>>count_mcmc_steps;
+    in>>count_mcmc_steps_since_save;
 }
 
 } // namespace DNest4
