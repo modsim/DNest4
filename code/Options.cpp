@@ -14,7 +14,8 @@ Options::Options(unsigned int num_particles,
 		 unsigned int max_num_levels,
 		 double lambda,
 		 double beta,
-		 unsigned int max_num_saves)
+		 unsigned int max_num_saves,
+         bool write_exact_representation)
 :num_particles(num_particles)
 ,new_level_interval(new_level_interval)
 ,save_interval(save_interval)
@@ -27,6 +28,9 @@ Options::Options(unsigned int num_particles,
 ,sample_info_file("sample_info.txt")
 ,levels_file("levels.txt")
 ,checkpoint_file("sampler_state.txt")
+,best_particle_file("best_sample.txt")
+,best_likelihood_file("best_likelihood.txt")
+,write_exact_representation(write_exact_representation)
 {
 	assert(num_particles > 0 && new_level_interval > 0 &&
 		max_num_levels > 0 && lambda > 0. &&
@@ -93,6 +97,7 @@ void Options::print(std::ostream& out) const
 	out<<sample_info_file<<' ';
 	out<<levels_file<<' ';
 	out<<checkpoint_file<<' ';
+    out<<write_exact_representation<<' ';
 }
 
 void Options::read(std::istream& in)
@@ -110,6 +115,7 @@ void Options::read(std::istream& in)
 	in>>sample_info_file;
 	in>>levels_file;
 	in>>checkpoint_file;
+    in>>write_exact_representation;
 }
 
 } // namespace DNest4

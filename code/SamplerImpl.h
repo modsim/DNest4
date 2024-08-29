@@ -43,6 +43,8 @@ Sampler<ModelType>::Sampler(unsigned int num_threads, double compression,
 	assert(num_threads >= 1);
 	assert(compression > 1.);
 
+    std::cout << "using threads " << num_threads << std::endl;
+
     if(options.max_num_levels == 0 && std::abs(compression - exp(1.0)) > 1E-6)
     {
         std::cerr<<"# ERROR: Cannot use -c with max_num_levels=0 (AUTO).";
@@ -60,7 +62,6 @@ template<class ModelType>
 void Sampler<ModelType>::save_checkpoint() {
     std::string temp_name = options.checkpoint_file + ".next";
     std::fstream fout(temp_name, std::ios::out);
-    fout << std::scientific << std::setprecision(16);
     if(fout.is_open()) {
         this->print(fout);
         fout.close();
@@ -82,8 +83,7 @@ void Sampler<ModelType>::read_checkpoint() {
         exit(1);
     }
     if(options.max_num_saves != 0 && count_saves>=options.max_num_saves) {
-        std::cout << "max num saves already achieved" << std::endl;
-        exit(0);
+        std::cout << "max num saves already achieved. Increase the max_num_saves to continue sampling." << std::endl;
     }
 }
 
@@ -91,16 +91,16 @@ void Sampler<ModelType>::read_checkpoint() {
 template<class ModelType>
 void Sampler<ModelType>::initialise(unsigned int first_seed, bool continue_from_checkpoint)
 {
+    // Assign memory for storage
+    all_above.reserve(2*options.new_level_interval);
+    for(auto& a: above)
+        a.reserve(2*options.new_level_interval);
+
     if(continue_from_checkpoint) {
-        std::cout << "# Continuing from checkpoint ";
+        std::cout << "# Continuing from checkpoint " << std::endl;
         read_checkpoint();
     }
     else {
-        // Assign memory for storage
-        all_above.reserve(2*options.new_level_interval);
-        for(auto& a: above)
-            a.reserve(2*options.new_level_interval);
-
         std::cout << "# Seeding random number generators. First seed = ";
         std::cout << first_seed << "." << std::endl;
         // Seed the RNGs, incrementing the seed each time
@@ -179,9 +179,6 @@ void Sampler<ModelType>::run(unsigned int thin)
 	// TODO check signal is caught here too
 	for(size_t i=0; i<threads.size(); ++i) run_thread(i);
 #endif
-
-	// Save the sampler state to a file.
-    this->save_checkpoint();
 }
 
 template<class ModelType>
@@ -211,9 +208,9 @@ void Sampler<ModelType>::mcmc_thread(unsigned int thread)
 			update_level_assignment(thread, which);
 			update_particle(thread, which);
 		}
-		if(!enough_levels(_levels) &&
-				_levels.back().get_log_likelihood() < log_likelihoods[which])
-			above[thread].push_back(log_likelihoods[which]);
+		if(!enough_levels(_levels) && _levels.back().get_log_likelihood() < log_likelihoods[which]) {
+            above[thread].push_back(log_likelihoods[which]);
+        }
 	}
 }
 
@@ -244,9 +241,6 @@ void Sampler<ModelType>::update_particle(unsigned int thread, unsigned int which
     {
     	LikelihoodType logl_proposal(particle.proposal_log_likelihood(),
 												logl.get_tiebreaker());
-
-    	// Do the proposal for the tiebreaker
-    	log_H += logl_proposal.perturb(rng);
 
 	    // Accept?
 	    if(level.get_log_likelihood() < logl_proposal)
@@ -327,8 +321,9 @@ void Sampler<ModelType>::run_thread(unsigned int thread)
 		if(thread == 0)
 		{
 			// Each thread will write over its own copy of the levels
-			for(unsigned int i=0; i<num_threads; ++i)
-				copies_of_levels[i] = levels;
+			for(unsigned int i=0; i<num_threads; ++i) {
+                copies_of_levels[i] = levels;
+            }
 		}
 
 #ifndef NO_THREADS
@@ -376,8 +371,9 @@ void Sampler<ModelType>::run_thread(unsigned int thread)
 			// Combine into a single vector
 			for(auto& a: above)
 			{
-				for(const auto& element: a)
-					all_above.push_back(element);
+				for(const auto& element: a) {
+                    all_above.push_back(element);
+                }
 				a.clear();
 			}
 
@@ -433,8 +429,6 @@ bool Sampler<ModelType>::enough_levels(const std::vector<Level>& l) const
 template<class ModelType>
 void Sampler<ModelType>::do_bookkeeping()
 {
-	bool created_level = false;
-
 	// Create a new level?
 	if(!enough_levels(levels) &&
         (all_above.size() >= options.new_level_interval))
@@ -443,13 +437,14 @@ void Sampler<ModelType>::do_bookkeeping()
 		std::sort(all_above.begin(), all_above.end());
 		int index = static_cast<int>((1. - 1./compression)*all_above.size());
 		std::cout<<"# Creating level "<<levels.size()<<" with log likelihood = ";
-		std::cout<<std::setprecision(12);
+        std::cout << std::scientific << std::setprecision(16);
 		std::cout<<all_above[index].get_value()<<"."<<std::endl;
 
 		levels.push_back(Level(all_above[index]));
 		all_above.erase(all_above.begin(), all_above.begin() + index + 1);
-		for(auto& a:above)
-			a.clear();
+		for(auto& a:above) {
+            a.clear();
+        }
 
 		// If last level
 		if(enough_levels(levels))
@@ -466,8 +461,6 @@ void Sampler<ModelType>::do_bookkeeping()
 			// If it's not the last level, look for lagging particles
 			kill_lagging_particles();
 		}
-
-		created_level = true;
 	}
 
 	// Recalculate log_X values of levels
@@ -502,36 +495,19 @@ void Sampler<ModelType>::do_bookkeeping()
             work_ratio = 1.0;
     }
 
-	// Save levels if one was created
-	if(created_level)
-	{
+	if(count_mcmc_steps_since_save >= options.save_interval) {
+        ++count_saves;
+        count_mcmc_steps_since_save = 0;
         save_levels();
+        save_particle();
         save_checkpoint();
-    }
-
-	if(count_mcmc_steps_since_save >= options.save_interval)
-	{
-		save_particle();
-        save_checkpoint();
-
-		// If a level was not created, save anyway because of the time
-		if(!created_level)
-			save_levels();
-
-        // Print work ratio
-        if(!enough_levels(levels) && adaptive)
-        {
-            std::cout << "# Difficulty = " << difficulty << ".\n";
-            std::cout << "# Work ratio = " << work_ratio << ".\n" << std::endl;
+        // Check for a new record holder
+        auto indices = argsort(log_likelihoods);
+        if (best_ever_log_likelihood < log_likelihoods[indices.back()]) {
+            best_ever_particle = particles[indices.back()];
+            best_ever_log_likelihood = log_likelihoods[indices.back()];
+            save_best_particle();
         }
-	}
-
-    // Check for a new record holder
-    auto indices = argsort(log_likelihoods);
-    if(best_ever_log_likelihood < log_likelihoods[indices.back()])
-    {
-        best_ever_particle = particles[indices.back()];
-        best_ever_log_likelihood = log_likelihoods[indices.back()];
     }
 }
 
@@ -579,7 +555,12 @@ void Sampler<ModelType>::save_levels() const
 	fout.open(options.levels_file, std::ios::out);
 	fout<<"# log_X, log_likelihood, tiebreaker, accepts, tries, exceeds, visits";
 	fout<<std::endl;
-    fout<<std::setprecision(12);
+    if(options.write_exact_representation) {
+        fout << std::hexfloat;
+    }
+    else {
+        fout << std::scientific << std::setprecision(16);
+    }
 
 
 	for(const Level& level: levels)
@@ -596,28 +577,53 @@ void Sampler<ModelType>::save_levels() const
 }
 
 template<class ModelType>
+void Sampler<ModelType>::save_best_particle() const
+{
+    std::fstream fout;
+    fout.open(options.best_particle_file, std::ios::out|std::ios::app);
+    if(options.write_exact_representation) {
+        fout << std::hexfloat;
+    }
+    else {
+        fout << std::scientific << std::setprecision(16);
+    }
+    best_ever_particle.print(fout);
+    fout<<std::endl;
+    fout.close();
+    fout.open(options.best_likelihood_file, std::ios::out|std::ios::app);
+    // always write best likelihood in readable format
+    fout << std::scientific << std::setprecision(16);
+    best_ever_log_likelihood.print(fout);
+    fout<<std::endl;
+    fout.close();
+}
+
+template<class ModelType>
 void Sampler<ModelType>::save_particle()
 {
-	++count_saves;
-    count_mcmc_steps_since_save = 0;
-
 	if(!save_to_disk)
 		return;
 
-	if(count_saves % thin_print == 0)
-		std::cout<<"# Saving particle to disk. N = "<<count_saves<<"."<<std::endl;
-
-	// Output file
-	std::fstream fout;
-
 	int which = rngs[0].rand_int(particles.size());
-	fout.open(options.sample_file, std::ios::out|std::ios::app);
+    std::fstream fout;
+    fout.open(options.sample_file, std::ios::out|std::ios::app);
+    if(options.write_exact_representation) {
+        fout << std::hexfloat;
+    }
+    else {
+        fout << std::scientific << std::setprecision(16);
+    }
 	particles[which].print(fout);
 	fout<<std::endl;
 	fout.close();
 
 	fout.open(options.sample_info_file, std::ios::out|std::ios::app);
-	fout<<std::setprecision(12);
+    if(options.write_exact_representation) {
+        fout << std::hexfloat;
+    }
+    else {
+        fout << std::scientific << std::setprecision(16);
+    }
 
 	fout<<level_assignments[which]<<' ';
 	fout<<log_likelihoods[which].get_value()<<' ';
@@ -685,29 +691,32 @@ void Sampler<ModelType>::kill_lagging_particles()
 template<class ModelType>
 void Sampler<ModelType>::print(std::ostream& out) const
 {
-    // doubles have between 15 and 16 digits of precision
-    out << std::scientific << std::setprecision(16);
+
+    out<<options<<' ';
+    out << std::hexfloat;
     out<<save_to_disk<<' ';
     out<<num_threads<<' ';
     out<<compression<<' ';
 
-    out<<options<<' ';
-
     out << particles.size() << ' ';
-    for(const auto& p: particles)
+    for(const auto& p: particles) {
         p.print(out);
-
+        p.print_internal(out);
+    }
     out << log_likelihoods.size() << ' ';
-    for(const auto& l: log_likelihoods)
+    for(const auto& l: log_likelihoods) {
         l.print(out);
+    }
 
     out << level_assignments.size() << ' ';
-    for(const auto& l: level_assignments)
-        out<<l<<' ';
+    for(const auto& l: level_assignments) {
+        out << l << ' ';
+    }
 
     out << levels.size() << ' ';
-    for(const auto& l: levels)
+    for(const auto& l: levels) {
         l.print(out);
+    }
 
     out << all_above.size() << ' ';
     for(const auto& l: all_above) {
@@ -729,19 +738,25 @@ void Sampler<ModelType>::print(std::ostream& out) const
     out<<count_saves<<' ';
     out<<count_mcmc_steps<<' ';
     out<<count_mcmc_steps_since_save<<' ';
+    out<<difficulty<<' ';
+    out<<work_ratio<<' ';
 }
 
 template<class ModelType>
 void Sampler<ModelType>::read(std::istream& in)
 {
-    in>>save_to_disk;
-    in>>num_threads;
-    in>>compression;
-
     // We want to log the used options, but we do not want to overwrite
     // the passed options. We need to read the options so the stream skips over them.
     Options throw_away_options;
     in>>throw_away_options;
+
+    in>>save_to_disk;
+    in>>num_threads;
+    // doubles written in hexfloat format to avoid loss of precision
+    // correctly parsing hexfloat requires a temporary string and std::strtod
+    std::string temp_string;
+    in>>temp_string;
+    compression = std::strtod(temp_string.c_str(), NULL);
 
     size_t num_particles;
     in >> num_particles;
@@ -749,6 +764,7 @@ void Sampler<ModelType>::read(std::istream& in)
     for(size_t i=0; i<num_particles;++i) {
         ModelType p;
         p.read(in);
+        p.read_internal(in);
         particles.push_back(p);
     }
 
@@ -779,10 +795,10 @@ void Sampler<ModelType>::read(std::istream& in)
         levels.push_back(level);
     }
 
-    size_t num_above;
-    in >> num_above;
+    size_t num_all_above;
+    in >> num_all_above;
     all_above.clear();
-    for(size_t i=0; i<num_above;++i) {
+    for(size_t i=0; i<num_all_above;++i) {
         LikelihoodType l;
         l.read(in);
         all_above.push_back(l);
@@ -807,6 +823,11 @@ void Sampler<ModelType>::read(std::istream& in)
     in>>count_saves;
     in>>count_mcmc_steps;
     in>>count_mcmc_steps_since_save;
+    std::string string_repr;
+    in>>string_repr;
+    difficulty = std::strtod(string_repr.c_str(), NULL);
+    in>>string_repr;
+    work_ratio = std::strtod(string_repr.c_str(), NULL);
 }
 
 } // namespace DNest4

@@ -8,10 +8,11 @@ using namespace DNest4;
 
 int main(int argc, char** argv)
 {
-	Data::get_instance().load("road.txt");
+	Data::get_instance().load("road");
     CommandLineOptions options(argc, argv);
-    Sampler<StraightLine> sampler = setup<StraightLine>(options, true);
+    Sampler<StraightLine> sampler = setup<StraightLine>(options, false);
     sampler.run();
+
 	return 0;
 }
 

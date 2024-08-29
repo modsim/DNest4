@@ -67,7 +67,9 @@ void Level::print(ostream& out) const
 void Level::read(istream& in)
 {
 	log_likelihood.read(in);
-	in>>log_X;
+    std::string string_repr;
+    in>>string_repr;
+	log_X = std::strtod(string_repr.c_str(), NULL);
 	in>>visits;
 	in>>exceeds;
 	in>>accepts;

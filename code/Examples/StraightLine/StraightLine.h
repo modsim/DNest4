@@ -46,6 +46,10 @@ class StraightLine
 		// Print to stream
 		void print(std::ostream& out) const;
 
+        void read_internal(std::istream& in);
+        // Print to internal state to stream
+        void print_internal(std::ostream& out) const;
+
 		// Return string with column information
 		std::string description() const;
 };

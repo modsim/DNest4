@@ -33,7 +33,6 @@ class Sampler
 		unsigned int num_threads;
 		double compression;
 
-		// Options (most useful comment ever)
 		Options options;
         bool adaptive;
 
@@ -100,6 +99,7 @@ class Sampler
         void save_checkpoint();
 		void initialise_output_files() const;
 		void save_levels() const;
+        void save_best_particle() const;
 		void save_particle();
 
 	public:
@@ -136,9 +136,6 @@ class Sampler
 
 		const std::vector<unsigned int> get_level_assignments() const
 		{ return level_assignments; }
-
-        const ModelType& get_best_ever_particle() const
-        { return best_ever_particle; }
 
 		int size () const { return particles.size(); };
 		ModelType* particle (unsigned int i) { return &(particles[i]); };

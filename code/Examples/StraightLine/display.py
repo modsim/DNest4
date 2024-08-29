@@ -1,7 +1,7 @@
 from pylab import *
 
 # Load the data, plot it, and overplot regression lines
-data = loadtxt('road.txt')
+data = loadtxt('road')
 posterior_sample = loadtxt('posterior_sample.txt')
 
 xmin = data[:,0].min()

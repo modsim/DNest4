@@ -48,8 +48,11 @@ void LikelihoodType::print(std::ostream& out) const
 
 void LikelihoodType::read(std::istream& in)
 {
-	in>>value;
-	in>>tiebreaker;
+    std::string string_repr;
+	in>>string_repr;
+    value = std::strtod(string_repr.c_str(), NULL);
+	in>>string_repr;
+    tiebreaker = std::strtod(string_repr.c_str(), NULL);
 }
 
 } // namespace DNest4

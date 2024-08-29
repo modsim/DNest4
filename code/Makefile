@@ -19,7 +19,6 @@ libdnest4.a: $(OBJS)
 examples: $(OBJS) libdnest4.a
 	# make nolib -C Examples/SpikeSlab 
 	make nolib -C Examples/StraightLine 
-	# make nolib -C Examples/RJObject_1DMixture -I ../../../../
 	# make nolib -C Examples/RJObject_SineWaves -I ../../../../
 	# make nolib -C Examples/RJObject_GalaxyField -I ../../../../
 	# make nolib -C Examples/ABC -I ../../../../

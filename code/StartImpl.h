@@ -34,7 +34,7 @@ Sampler<ModelType> setup(const CommandLineOptions& options, bool load_checkpoint
 								true, options.get_adaptive());
 
 	// Seed RNGs
-	sampler.initialise(options.get_seed_uint(), load_checkpoint);
+	sampler.initialise(0, load_checkpoint);
 
 	return sampler;
 }

@@ -23,7 +23,8 @@ class Options
 			unsigned int max_num_levels,
 			double lambda,
 			double beta,
-			unsigned int max_num_saves);
+			unsigned int max_num_saves,
+            bool write_exact_representation);
 
 		Options(const char* filename);
 		void load(const char* filename);
@@ -45,6 +46,10 @@ class Options
         std::string sample_info_file;
         std::string levels_file;
         std::string checkpoint_file;
+        std::string best_particle_file;
+        std::string best_likelihood_file;
+
+        bool write_exact_representation = true;
 };
 
 } // namespace DNest4
