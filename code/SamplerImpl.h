@@ -99,6 +99,7 @@ void Sampler<ModelType>::initialise(unsigned int first_seed, bool continue_from_
     if(continue_from_checkpoint) {
         std::cout << "# Continuing from checkpoint " << std::endl;
         read_checkpoint();
+        std::cout<< "loaded count saves as " << count_saves << " and mcmc steps " << count_mcmc_steps << std::endl;
     }
     else {
         std::cout << "# Seeding random number generators. First seed = ";
@@ -241,6 +242,9 @@ void Sampler<ModelType>::update_particle(unsigned int thread, unsigned int which
     {
     	LikelihoodType logl_proposal(particle.proposal_log_likelihood(),
 												logl.get_tiebreaker());
+
+        // perturb likelihood to obtain new tiebreaker
+        logl_proposal.perturb(rng);
 
 	    // Accept?
 	    if(level.get_log_likelihood() < logl_proposal)
@@ -436,6 +440,7 @@ void Sampler<ModelType>::do_bookkeeping()
 		// Create the level
 		std::sort(all_above.begin(), all_above.end());
 		int index = static_cast<int>((1. - 1./compression)*all_above.size());
+		std::cout << "likelihood index is " << index << std::endl;
 		std::cout<<"# Creating level "<<levels.size()<<" with log likelihood = ";
         std::cout << std::scientific << std::setprecision(16);
 		std::cout<<all_above[index].get_value()<<"."<<std::endl;
@@ -453,7 +458,6 @@ void Sampler<ModelType>::do_bookkeeping()
             double reg = options.new_level_interval*sqrt(options.lambda);
 			Level::renormalise_visits(levels, static_cast<int>(reg));
 			all_above.clear();
-            options.max_num_levels = levels.size();
             std::cout<<"# Done creating levels."<<std::endl;
 		}
 		else
@@ -501,7 +505,7 @@ void Sampler<ModelType>::do_bookkeeping()
         save_levels();
         save_particle();
         save_checkpoint();
-        // Check for a new record holder
+        // TODO: test doing this before: Check for a new record holder
         auto indices = argsort(log_likelihoods);
         if (best_ever_log_likelihood < log_likelihoods[indices.back()]) {
             best_ever_particle = particles[indices.back()];
@@ -677,6 +681,7 @@ void Sampler<ModelType>::kill_lagging_particles()
 
 				particles[i] = particles[i_copy];
 				log_likelihoods[i] = log_likelihoods[i_copy];
+                std::cout << "writing all above as" << std::endl;
 				level_assignments[i] = level_assignments[i_copy];
 				++deletions;
 
@@ -703,6 +708,7 @@ void Sampler<ModelType>::print(std::ostream& out) const
         p.print(out);
         p.print_internal(out);
     }
+
     out << log_likelihoods.size() << ' ';
     for(const auto& l: log_likelihoods) {
         l.print(out);
@@ -724,16 +730,14 @@ void Sampler<ModelType>::print(std::ostream& out) const
     }
 
     out << rngs.size() << ' ';
-    for(const auto& r: rngs) {
-         std::array<unsigned char, 16>  state = r.engine.getStateInBytes();
-         for(size_t i=0; i<state.size();++i) {
-            out << state[i] << ' ';
-         }
-         std::array<unsigned char, 16>  stream = r.engine.getStreamInBytes();
-         for(size_t i=0; i<stream.size();++i) {
-            out << stream[i] << ' ';
-         }
+    for (const auto& r : rngs) {
+        std::array<unsigned char, 16> state = r.engine.getStateInBytes();
+        out.write(reinterpret_cast<const char*>(state.data()), state.size());
+
+        std::array<unsigned char, 16> stream = r.engine.getStreamInBytes();
+        out.write(reinterpret_cast<const char*>(stream.data()), stream.size());
     }
+
 
     out<<count_saves<<' ';
     out<<count_mcmc_steps<<' ';
@@ -806,28 +810,25 @@ void Sampler<ModelType>::read(std::istream& in)
 
     size_t num_rngs;
     in >> num_rngs;
-    for(size_t i=0; i<num_rngs;++i) {
-        std::array<unsigned char, 16>  state;
-        for(size_t j=0; j<state.size();++j) {
-           in >> state[j];
-        }
+    in.get();  // To consume the space after num_rngs
+    for (size_t i = 0; i < num_rngs; ++i) {
+        std::array<unsigned char, 16> state;
+        in.read(reinterpret_cast<char*>(state.data()), state.size());
         rngs[i].engine.setState(state);
 
-        std::array<unsigned char, 16>  stream;
-        for(size_t j=0; j<stream.size();++j) {
-            in >> stream[j];
-        }
+        std::array<unsigned char, 16> stream;
+        in.read(reinterpret_cast<char*>(stream.data()), stream.size());
         rngs[i].engine.setStream(stream);
     }
 
     in>>count_saves;
     in>>count_mcmc_steps;
     in>>count_mcmc_steps_since_save;
-    std::string string_repr;
-    in>>string_repr;
-    difficulty = std::strtod(string_repr.c_str(), NULL);
-    in>>string_repr;
-    work_ratio = std::strtod(string_repr.c_str(), NULL);
+    std::string difficulty_string, work_ratio_string;
+    in>>difficulty_string;
+    difficulty = std::strtod(difficulty_string.c_str(), NULL);
+    in>>work_ratio_string;
+    work_ratio = std::strtod(work_ratio_string.c_str(), NULL);
 }
 
 } // namespace DNest4

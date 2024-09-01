@@ -38,10 +38,17 @@ def my_loadtxt(filename, single_precision=False, delimiter=" "):
 
             # Otherwise, include in results
             if single_precision:
-                results.append(np.array([float(cell) for cell in cells],\
-                                                          dtype="float32"))
+                try:
+                    results.append(np.array([float(cell) for cell in cells],\
+                                                              dtype="float32"))
+                except ValueError as e:
+                    results.append(np.array([float.fromhex(cell) for cell in cells],\
+                                                              dtype="float32"))
             else:
-                results.append(np.array([float(cell) for cell in cells]))
+                try:
+                    results.append(np.array([float(cell) for cell in cells]))
+                except ValueError as e:
+                    results.append(np.array([float.fromhex(cell) for cell in cells]))
             nrow += 1
 
     results = np.vstack(results)
@@ -81,10 +88,17 @@ def loadtxt_rows(filename, rows, single_precision=False):
             # Otherwise, include in results
             if i in rows:
                 if single_precision:
-                    results[i] = np.array([float(cell) for cell in cells],\
+                    try:
+                        results[i] = np.array([float(cell) for cell in cells],\
+                                                              dtype="float32")
+                    except ValueError as e:
+                        results[i] = np.array([float.fromhex(cell) for cell in cells],\
                                                               dtype="float32")
                 else:
-                    results[i] = np.array([float(cell) for cell in cells])
+                    try:
+                        results[i] = np.array([float(cell) for cell in cells])
+                    except ValueError as e:
+                        results[i] = np.array([float.fromhex(cell) for cell in cells])
             i += 1
 
     results["ncol"] = ncol
