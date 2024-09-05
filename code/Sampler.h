@@ -51,8 +51,10 @@ class Sampler
 		std::vector<Level> levels;
 		std::vector< std::vector<Level> > copies_of_levels;
 
+public:
 		// Storage for creating new levels
 		std::vector<LikelihoodType> all_above;
+private:
 
 		// Random number generators
 		std::vector<RNG> rngs;
@@ -66,7 +68,9 @@ class Sampler
         double difficulty, work_ratio;
 
 		// Storage for likelihoods above threshold
+public:
 		std::vector< std::vector<LikelihoodType> > above;
+private:
 
 		/* Private methods */
 		// Master function to be called from each thread
@@ -94,9 +98,6 @@ class Sampler
         // Are there enough levels?
         bool enough_levels(const std::vector<Level>& l) const;
 
-		// Functions to do with the output files
-        void read_checkpoint();
-        void save_checkpoint();
 		void initialise_output_files() const;
 		void save_levels() const;
         void save_best_particle() const;
@@ -147,6 +148,9 @@ class Sampler
 
 		void print(std::ostream& out) const;
 		void read(std::istream& in);
+
+        void read_checkpoint();
+        void save_checkpoint();
 };
 
 } // namespace DNest4

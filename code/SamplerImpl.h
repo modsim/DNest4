@@ -52,10 +52,11 @@ Sampler<ModelType>::Sampler(unsigned int num_threads, double compression,
         exit(0);
     }
 
-    // Find best ever particle
+//    // Find best ever particle
     auto indices = argsort(log_likelihoods);
     best_ever_particle = particles[indices.back()];
     best_ever_log_likelihood = log_likelihoods[indices.back()];
+    std::cout << std::scientific << std::setprecision(16);
 }
 
 template<class ModelType>
@@ -93,8 +94,10 @@ void Sampler<ModelType>::initialise(unsigned int first_seed, bool continue_from_
 {
     // Assign memory for storage
     all_above.reserve(2*options.new_level_interval);
-    for(auto& a: above)
-        a.reserve(2*options.new_level_interval);
+    for(auto& a: above) {
+        a.reserve(2 * options.new_level_interval);
+        a.clear();
+    }
 
     if(continue_from_checkpoint) {
         std::cout << "# Continuing from checkpoint " << std::endl;
@@ -209,6 +212,8 @@ void Sampler<ModelType>::mcmc_thread(unsigned int thread)
 			update_level_assignment(thread, which);
 			update_particle(thread, which);
 		}
+        std::cout << log_likelihoods[which].get_value() << " for particle " << which << " w level " << _levels.back().get_log_likelihood().get_value() << std::endl;
+        std::cout << level_assignments[thread]  <<  " " << particles[which].proposal->getState().transpose() << std::endl;
 		if(!enough_levels(_levels) && _levels.back().get_log_likelihood() < log_likelihoods[which]) {
             above[thread].push_back(log_likelihoods[which]);
         }
@@ -272,21 +277,25 @@ void Sampler<ModelType>::update_particle(unsigned int thread, unsigned int which
 
 template<class ModelType>
 void Sampler<ModelType>::update_level_assignment(unsigned int thread,
-													unsigned int which)
-{
-	// Reference to the RNG for this thread
-	RNG& rng = rngs[thread];
+													unsigned int which) {
+    // Reference to the RNG for this thread
+    RNG &rng = rngs[thread];
 
-	// Reference to this thread's copy of levels
-	std::vector<Level>& _levels = copies_of_levels[thread];
+    // Reference to this thread's copy of levels
+    std::vector<Level> &_levels = copies_of_levels[thread];
 
-	// Generate proposal
-	int proposal = static_cast<int>(level_assignments[which])
-						+ static_cast<int>(pow(10., 2.*rng.rand())*rng.randn());
+    // Generate proposal
+    int proposal = static_cast<int>(level_assignments[which])
+                   + static_cast<int>(pow(10., 2. * rng.rand()) * rng.randn());
 
-	// If the proposal was to not move, go +- one level
-	if(proposal == static_cast<int>(level_assignments[which]))
-		proposal = ((rng.rand() < 0.5)?(proposal-1):(proposal+1));
+    // If the proposal was to not move, go +- one level
+    if (proposal == static_cast<int>(level_assignments[which])) {
+        if (rng.rand() < 0.5) {
+            proposal = proposal-1;
+        } else {
+            proposal = proposal+1;
+        }
+    }
 
 	// Wrap into allowed range
 	proposal = DNest4::mod(proposal, static_cast<int>(_levels.size()));
@@ -372,6 +381,14 @@ void Sampler<ModelType>::run_thread(unsigned int thread)
 				}
 			}
 
+            std::cout << "thread " << thread << " has " << all_above.size() << " likelihoods stored: ";
+            for(size_t i=0; i<above.size(); ++i) {
+                for(const auto& l: above[i]) {
+                    l.print(std::cout);
+                }
+                std::cout << std::endl;
+            }
+
 			// Combine into a single vector
 			for(auto& a: above)
 			{
@@ -440,9 +457,8 @@ void Sampler<ModelType>::do_bookkeeping()
 		// Create the level
 		std::sort(all_above.begin(), all_above.end());
 		int index = static_cast<int>((1. - 1./compression)*all_above.size());
-		std::cout << "likelihood index is " << index << std::endl;
+		std::cout << "likelihood index is " << index << " with " << all_above.size() << std::endl;
 		std::cout<<"# Creating level "<<levels.size()<<" with log likelihood = ";
-        std::cout << std::scientific << std::setprecision(16);
 		std::cout<<all_above[index].get_value()<<"."<<std::endl;
 
 		levels.push_back(Level(all_above[index]));
@@ -505,7 +521,6 @@ void Sampler<ModelType>::do_bookkeeping()
         save_levels();
         save_particle();
         save_checkpoint();
-        // TODO: test doing this before: Check for a new record holder
         auto indices = argsort(log_likelihoods);
         if (best_ever_log_likelihood < log_likelihoods[indices.back()]) {
             best_ever_particle = particles[indices.back()];
@@ -699,6 +714,13 @@ void Sampler<ModelType>::print(std::ostream& out) const
 
     out<<options<<' ';
     out << std::hexfloat;
+
+    out<<count_saves<<' ';
+    out<<count_mcmc_steps<<' ';
+    out<<count_mcmc_steps_since_save<<' ';
+    out<<difficulty<<' ';
+    out<<work_ratio<<' ';
+
     out<<save_to_disk<<' ';
     out<<num_threads<<' ';
     out<<compression<<' ';
@@ -731,19 +753,8 @@ void Sampler<ModelType>::print(std::ostream& out) const
 
     out << rngs.size() << ' ';
     for (const auto& r : rngs) {
-        std::array<unsigned char, 16> state = r.engine.getStateInBytes();
-        out.write(reinterpret_cast<const char*>(state.data()), state.size());
-
-        std::array<unsigned char, 16> stream = r.engine.getStreamInBytes();
-        out.write(reinterpret_cast<const char*>(stream.data()), stream.size());
+        r.engine.serialize(out);
     }
-
-
-    out<<count_saves<<' ';
-    out<<count_mcmc_steps<<' ';
-    out<<count_mcmc_steps_since_save<<' ';
-    out<<difficulty<<' ';
-    out<<work_ratio<<' ';
 }
 
 template<class ModelType>
@@ -753,6 +764,15 @@ void Sampler<ModelType>::read(std::istream& in)
     // the passed options. We need to read the options so the stream skips over them.
     Options throw_away_options;
     in>>throw_away_options;
+
+    in>>count_saves;
+    in>>count_mcmc_steps;
+    in>>count_mcmc_steps_since_save;
+    std::string difficulty_string, work_ratio_string;
+    in>>difficulty_string;
+    difficulty = std::strtod(difficulty_string.c_str(), NULL);
+    in>>work_ratio_string;
+    work_ratio = std::strtod(work_ratio_string.c_str(), NULL);
 
     in>>save_to_disk;
     in>>num_threads;
@@ -812,23 +832,8 @@ void Sampler<ModelType>::read(std::istream& in)
     in >> num_rngs;
     in.get();  // To consume the space after num_rngs
     for (size_t i = 0; i < num_rngs; ++i) {
-        std::array<unsigned char, 16> state;
-        in.read(reinterpret_cast<char*>(state.data()), state.size());
-        rngs[i].engine.setState(state);
-
-        std::array<unsigned char, 16> stream;
-        in.read(reinterpret_cast<char*>(stream.data()), stream.size());
-        rngs[i].engine.setStream(stream);
+        rngs[i].engine = hops::RandomNumberGenerator::deserialize(in);
     }
-
-    in>>count_saves;
-    in>>count_mcmc_steps;
-    in>>count_mcmc_steps_since_save;
-    std::string difficulty_string, work_ratio_string;
-    in>>difficulty_string;
-    difficulty = std::strtod(difficulty_string.c_str(), NULL);
-    in>>work_ratio_string;
-    work_ratio = std::strtod(work_ratio_string.c_str(), NULL);
 }
 
 } // namespace DNest4
