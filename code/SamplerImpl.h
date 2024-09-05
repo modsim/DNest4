@@ -52,7 +52,7 @@ Sampler<ModelType>::Sampler(unsigned int num_threads, double compression,
         exit(0);
     }
 
-//    // Find best ever particle
+    // Find best ever particle
     auto indices = argsort(log_likelihoods);
     best_ever_particle = particles[indices.back()];
     best_ever_log_likelihood = log_likelihoods[indices.back()];
@@ -100,9 +100,9 @@ void Sampler<ModelType>::initialise(unsigned int first_seed, bool continue_from_
     }
 
     if(continue_from_checkpoint) {
-        std::cout << "# Continuing from checkpoint " << std::endl;
         read_checkpoint();
-        std::cout<< "loaded count saves as " << count_saves << " and mcmc steps " << count_mcmc_steps << std::endl;
+        std::cout << "# Continuing from checkpoint. ";
+        std::cout<< "Loaded " << count_saves << " saves and " << count_mcmc_steps << " mcmc steps." << std::endl;
     }
     else {
         std::cout << "# Seeding random number generators. First seed = ";
@@ -212,8 +212,6 @@ void Sampler<ModelType>::mcmc_thread(unsigned int thread)
 			update_level_assignment(thread, which);
 			update_particle(thread, which);
 		}
-        std::cout << log_likelihoods[which].get_value() << " for particle " << which << " w level " << _levels.back().get_log_likelihood().get_value() << std::endl;
-        std::cout << level_assignments[thread]  <<  " " << particles[which].proposal->getState().transpose() << std::endl;
 		if(!enough_levels(_levels) && _levels.back().get_log_likelihood() < log_likelihoods[which]) {
             above[thread].push_back(log_likelihoods[which]);
         }
@@ -381,14 +379,6 @@ void Sampler<ModelType>::run_thread(unsigned int thread)
 				}
 			}
 
-            std::cout << "thread " << thread << " has " << all_above.size() << " likelihoods stored: ";
-            for(size_t i=0; i<above.size(); ++i) {
-                for(const auto& l: above[i]) {
-                    l.print(std::cout);
-                }
-                std::cout << std::endl;
-            }
-
 			// Combine into a single vector
 			for(auto& a: above)
 			{
@@ -457,7 +447,6 @@ void Sampler<ModelType>::do_bookkeeping()
 		// Create the level
 		std::sort(all_above.begin(), all_above.end());
 		int index = static_cast<int>((1. - 1./compression)*all_above.size());
-		std::cout << "likelihood index is " << index << " with " << all_above.size() << std::endl;
 		std::cout<<"# Creating level "<<levels.size()<<" with log likelihood = ";
 		std::cout<<all_above[index].get_value()<<"."<<std::endl;
 

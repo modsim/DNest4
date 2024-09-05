@@ -36,19 +36,15 @@ def my_loadtxt(filename, single_precision=False, delimiter=" "):
             if ncol is None:
                 ncol = len(cells)
 
-            # Otherwise, include in results
-            if single_precision:
+            parsed_cells = []
+            for cell in cells:
                 try:
-                    results.append(np.array([float(cell) for cell in cells],\
-                                                              dtype="float32"))
+                    parsed_cells.append(float(cell))
                 except ValueError as e:
-                    results.append(np.array([float.fromhex(cell) for cell in cells],\
-                                                              dtype="float32"))
-            else:
-                try:
-                    results.append(np.array([float(cell) for cell in cells]))
-                except ValueError as e:
-                    results.append(np.array([float.fromhex(cell) for cell in cells]))
+                    parsed_cells.append(float.fromhex(cell))
+
+            results.append(np.array([float(cell) for cell in parsed_cells],\
+                                                          dtype="float32" if single_precision else "float64"))
             nrow += 1
 
     results = np.vstack(results)
@@ -87,18 +83,15 @@ def loadtxt_rows(filename, rows, single_precision=False):
 
             # Otherwise, include in results
             if i in rows:
-                if single_precision:
+                parsed_cells = []
+                for cell in cells:
                     try:
-                        results[i] = np.array([float(cell) for cell in cells],\
-                                                              dtype="float32")
+                        parsed_cells.append(float(cell))
                     except ValueError as e:
-                        results[i] = np.array([float.fromhex(cell) for cell in cells],\
-                                                              dtype="float32")
-                else:
-                    try:
-                        results[i] = np.array([float(cell) for cell in cells])
-                    except ValueError as e:
-                        results[i] = np.array([float.fromhex(cell) for cell in cells])
+                        parsed_cells.append(float.fromhex(cell))
+
+                results[i] = np.array([float(cell) for cell in parsed_cells],\
+                                                              dtype="float32" if single_precision else "float64")
             i += 1
 
     results["ncol"] = ncol
