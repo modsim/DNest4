@@ -147,6 +147,12 @@ class CSVBackend(object):
             f.write("\n".join((self.sep.join(map("{0}".format, _))
                                for _ in stats.items())))
 
+    def parse_float(self, value):
+        try:
+            return float(value)
+        except ValueError:
+            return float.fromhex(value)
+
     @property
     def samples(self):
         sep = self.sep
@@ -157,9 +163,12 @@ class CSVBackend(object):
     @property
     def levels(self):
         with open(self._levels_filename, "r") as f:
+            lines = [tuple(line.split(self.sep)) for line in f
+                 if not line.startswith("#")]
+            for i in range(len(lines)):
+                lines[i] = tuple(self.parse_float(value) for value in lines[i])
             return np.array(
-                [tuple(line.split(self.sep)) for line in f
-                 if not line.startswith("#")],
+                lines,
                 dtype=[
                     ("log_X", float), ("log_likelihood", float),
                     ("tiebreaker", float), ("accepts", int),
@@ -170,9 +179,12 @@ class CSVBackend(object):
     @property
     def sample_info(self):
         with open(self._sample_info_filename, "r") as f:
+            lines = [tuple(line.split(self.sep)) for line in f
+                 if not line.startswith("#")]
+            for i in range(len(lines)):
+                lines[i] = tuple(self.parse_float(value) for value in lines[i])
             return np.array(
-                [tuple(line.split(self.sep)) for line in f
-                 if not line.startswith("#")],
+                lines,
                 dtype=[
                     ("level_assignment", int), ("log_likelihood", float),
                     ("tiebreaker", float), ("ID", int),
